@@ -78,6 +78,10 @@ void DummyPlayer_Init(Actor* actor, PlayState* play) {
     // #endregion
 
     player->cylinder.base.acFlags = AC_ON | AC_TYPE_PLAYER;
+    if (client.isBuddy && CVarGetInteger(CVAR_REMOTE_ANCHOR("BuddyCombat"), 1)) {
+        // Harkinian Buddy: enemies and bosses can hit this buddy too, like they hit you
+        player->cylinder.base.acFlags |= AC_TYPE_ENEMY;
+    }
     player->cylinder.base.ocFlags2 = OC2_TYPE_1;
     player->cylinder.info.bumperFlags = BUMP_ON | BUMP_HOOKABLE | BUMP_NO_HITMARK;
     player->actor.flags |= ACTOR_FLAG_HOOKSHOT_PULLS_PLAYER;
@@ -183,7 +187,24 @@ void DummyPlayer_Update(Actor* actor, PlayState* play) {
 
     actor->flags &= ~ACTOR_FLAG_LOCK_ON_DISABLED;
 
-    if (player->cylinder.base.acFlags & AC_HIT && player->invincibilityTimer == 0) {
+    // Who hit it: you (your sword, or an arrow / boomerang / hookshot / bomb you let fly) is the
+    // usual PvP hit; anything else (an enemy, a boss, a trap) is an enemy hit on a buddy.
+    Actor* attacker = player->cylinder.base.ac;
+    Actor* you = &GET_PLAYER(play)->actor;
+    bool fromYou = attacker == nullptr || attacker == you || attacker->parent == you ||
+                   attacker->id == ACTOR_PLAYER || attacker->id == ACTOR_EN_ARROW || attacker->id == ACTOR_EN_BOOM ||
+                   attacker->id == ACTOR_ARMS_HOOK || attacker->id == ACTOR_EN_BOM || attacker->id == ACTOR_EN_BOM_CHU ||
+                   attacker->id == ACTOR_MAGIC_FIRE || attacker->id == ACTOR_MAGIC_WIND || attacker->id == ACTOR_MAGIC_DARK;
+    bool hitByEnemy = !fromYou;
+    if (player->cylinder.base.acFlags & AC_HIT && player->invincibilityTimer == 0 && client.isBuddy &&
+        hitByEnemy) {
+        // an enemy (or boss, trap, hazard) hit a buddy: the app takes the hearts off and plays the hurt
+        u8 damage = player->cylinder.info.acHitInfo != nullptr ? player->cylinder.info.acHitInfo->toucher.damage : 8;
+        u8 effect = player->cylinder.info.acHitInfo != nullptr ? player->cylinder.info.acHitInfo->toucher.effect : 0;
+        Anchor::Instance->SendPacket_BuddyHit(client.clientId, damage, effect, attacker->id, attacker->world.pos);
+        Actor_SetColorFilter(&player->actor, 0x4000, 0xFF, 0, 8);
+        player->invincibilityTimer = 20;
+    } else if (player->cylinder.base.acFlags & AC_HIT && player->invincibilityTimer == 0 && !hitByEnemy) {
         Anchor::Instance->SendPacket_DamagePlayer(client.clientId, player->actor.colChkInfo.damageEffect,
                                                   player->actor.colChkInfo.damage);
         if (player->actor.colChkInfo.damageEffect == DUMMY_PLAYER_HIT_RESPONSE_STUN) {

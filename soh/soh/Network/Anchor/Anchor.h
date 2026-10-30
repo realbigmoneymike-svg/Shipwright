@@ -33,6 +33,7 @@ typedef struct {
     s16 sceneNum;
     s8 curRoomNum;
     s32 entranceIndex;
+    bool isBuddy; // a Harkinian Buddy bot ("harkinianBuddy" in its client state): enemies can hit it
 
     // Only available in PLAYER_UPDATE packets
     s32 linkAge;
@@ -118,6 +119,7 @@ class Anchor : public Network {
     // Packet types //
     inline static const std::string ALL_CLIENT_STATE = "ALL_CLIENT_STATE";
     inline static const std::string DAMAGE_PLAYER = "DAMAGE_PLAYER";
+    inline static const std::string BUDDY_HIT = "BUDDY_HIT";
     inline static const std::string DISABLE_ANCHOR = "DISABLE_ANCHOR";
     inline static const std::string ENTRANCE_DISCOVERED = "ENTRANCE_DISCOVERED";
     inline static const std::string GAME_COMPLETE = "GAME_COMPLETE";
@@ -158,6 +160,7 @@ class Anchor : public Network {
 
     void SendPacket_ClearTeamState(std::string teamId);
     void SendPacket_DamagePlayer(u32 clientId, u8 damageEffect, u8 damage);
+    void SendPacket_BuddyHit(u32 clientId, u8 damage, u8 damageEffect, s16 attackerActorId, Vec3f attackerPos);
     void SendPacket_EntranceDiscovered(u16 entranceIndex);
     void SendPacket_GameComplete();
     void SendPacket_GiveItem(u16 modId, s16 getItemId);
